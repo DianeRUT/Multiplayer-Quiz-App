@@ -1,56 +1,51 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+// import CustomTabBar from '../components/CustomTabBar'; // <-- IMPORT THE NEW COMPONENT
 
-// We no longer need useGame or useNavigation here.
-
-// Import all screens
-import HomeScreen from '../screens/main/HomeScreen';
+// Import all screens (no changes here)
+// import HomeScreen from '../screens/main/HomeScreen';
 import LeaderboardScreen from '../screens/main/LeaderboardScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import CategoryQuizListScreen from '../screens/main/CategoryQuizListScreen';
+import QuizDetailScreen from '../screens/main/QuizDetailScreen';
 import MyQuizzesScreen from '../screens/creator/MyQuizzesScreen';
 import CreateQuizScreen from '../screens/creator/CreateQuizScreen';
 import JoinGameScreen from '../screens/game/JoinGameScreen';
 import GameLobbyScreen from '../screens/game/GameLobbyScreen';
 import QuizScreen from '../screens/game/QuizScreen';
 import ResultsScreen from '../screens/game/ResultsScreen';
-
-import { colors } from '../theme/theme';
+import HomeScreen from '../screens/main/HomeScreen';
+import CustomTabBar from '../components/CustomTabBar';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-// This component has NO CHANGES.
+/**
+ * UPDATED: This component now uses a custom component for its tab bar,
+ * giving us full control over its appearance.
+ */
 const BottomTabNavigator = () => (
     <Tab.Navigator
-        screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
-            if (route.name === 'HomeTab') iconName = focused ? 'home' : 'home-outline';
-            else if (route.name === 'LeaderboardTab') iconName = focused ? 'trophy' : 'trophy-outline';
-            else if (route.name === 'ProfileTab') iconName = focused ? 'person' : 'person-outline';
-            return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: colors.secondary,
-        tabBarInactiveTintColor: colors.gray,
-        tabBarStyle: {
-            backgroundColor: colors.darkPurple, borderTopColor: colors.darkPurple, height: 90, paddingBottom: 30,
-        },
-        tabBarShowLabel: false,
-        })}
+        // Use the tabBar prop to provide our custom component
+        tabBar={props => <CustomTabBar {...props} />}
+        screenOptions={{
+            headerShown: false,
+        }}
     >
         <Tab.Screen name="HomeTab" component={HomeScreen} />
-        <Tab.Screen name="LeaderboardTab" component={LeaderboardScreen} />
+       
         <Tab.Screen name="ProfileTab" component={ProfileScreen} />
     </Tab.Navigator>
 );
 
-// This component is now simplified. The handler is gone.
 const MainAppTabs = () => (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="MainTabs" component={BottomTabNavigator} />
+        
+        {/* All other screens in the stack remain the same */}
+        <Stack.Screen name="CategoryQuizList" component={CategoryQuizListScreen} />
+        <Stack.Screen name="QuizDetail" component={QuizDetailScreen} />
         <Stack.Screen name="MyQuizzes" component={MyQuizzesScreen} />
         <Stack.Screen name="CreateQuiz" component={CreateQuizScreen} />
         <Stack.Screen name="JoinGame" component={JoinGameScreen} />

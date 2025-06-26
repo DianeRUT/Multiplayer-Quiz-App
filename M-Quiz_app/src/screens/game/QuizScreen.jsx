@@ -5,13 +5,21 @@ import { useGame } from '../../context/GameContext';
 import { colors, spacing, typography } from '../../theme/theme';
 import * as Progress from 'react-native-progress';
 
-const QuizScreen = () => {
+const QuizScreen = ({ navigation }) => {
   const { gameState, submitAnswer } = useGame();
   const { currentQuestion } = gameState;
   const [selectedOption, setSelectedOption] = useState(null);
   const [timeLeft, setTimeLeft] = useState(currentQuestion?.timeLimit || 10);
 
-  // Effect to reset state for each new question
+  // This useEffect handles the navigation when the game is over.
+  useEffect(() => {
+    if (gameState.status === 'results') {
+        // Use replace so the user can't press back to get to the quiz screen
+        navigation.replace('Results');
+    }
+  }, [gameState.status, navigation]);
+
+  // This effect resets the state for each new question from the server.
   useEffect(() => {
     if (currentQuestion) {
         setSelectedOption(null); // Clear previous selection
@@ -19,7 +27,7 @@ const QuizScreen = () => {
     }
   }, [currentQuestion]);
 
-  // Effect to handle the countdown timer
+  // This effect manages the countdown timer for the current question.
   useEffect(() => {
     if (!currentQuestion || timeLeft <= 0) return;
     const timer = setInterval(() => {
@@ -31,10 +39,9 @@ const QuizScreen = () => {
   const handleSelectOption = (option) => {
     if (selectedOption) return; // Prevent changing answer
     setSelectedOption(option);
-    submitAnswer({ optionText: option.text }); // Call context function to emit answer
+    submitAnswer({ optionText: option.text }); // Send answer to server via context
   };
 
-  // Show a loading/waiting state if there is no question yet
   if (!currentQuestion) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -46,12 +53,9 @@ const QuizScreen = () => {
     );
   }
 
-  // Determines the style of the option button based on selection state
   const getOptionStyle = (option) => {
     if (!selectedOption) return styles.option;
-    // Highlight the selected option
     if (option.text === selectedOption.text) return [styles.option, styles.selectedOption];
-    // Dim the other options
     return [styles.option, styles.disabledOption];
   }
 
@@ -60,7 +64,14 @@ const QuizScreen = () => {
       <View style={styles.container}>
         <View style={styles.header}>
             <Text style={styles.timerText}>{timeLeft}</Text>
-            <Progress.Bar progress={timeLeft / (currentQuestion.timeLimit || 10)} width={null} style={styles.progressBar} color={colors.secondary}/>
+            <Progress.Bar 
+                progress={timeLeft / (currentQuestion.timeLimit || 10)} 
+                width={null} 
+                style={styles.progressBar} 
+                color={colors.secondary}
+                unfilledColor={colors.card}
+                borderWidth={0}
+            />
         </View>
         
         <View style={styles.questionContainer}>
@@ -90,7 +101,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: spacing.md, justifyContent: 'space-between' },
   header: { alignItems: 'center', marginVertical: spacing.md },
   timerText: { ...typography.h1, marginBottom: spacing.sm },
-  progressBar: { width: '100%', height: 10, backgroundColor: colors.card },
+  progressBar: { width: '100%', height: 10 },
   questionContainer: {
     flex: 1,
     justifyContent: 'center',

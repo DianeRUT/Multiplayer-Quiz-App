@@ -33,3 +33,7 @@ export const generateQuizWithAI = async (topic, numQuestions) => {
     const { data } = await api.post('/ai/generate-quiz', { topic, numQuestions });
     return data;
 }
+export const getQuizDetailsById = async (quizId) => {
+  const { data } = await api.get(`/quizzes/${quizId}`);
+  return data;
+};

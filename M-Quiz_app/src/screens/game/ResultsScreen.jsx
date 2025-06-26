@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { useGame } from '../../context/GameContext';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, typography } from '../../theme/theme';
@@ -8,11 +9,11 @@ import AppButton from '../../components/AppButton';
 import { Ionicons } from '@expo/vector-icons';
 
 const ResultsScreen = () => {
+    const navigation = useNavigation();
     const { gameState, resetGame } = useGame();
-    const { user } = useAuth();
+    const { user } = useAuth(); // We need the user to check their role
     const { results } = gameState;
 
-    // A fallback for when the component renders before results are available
     if (!results || results.length === 0) {
         return (
             <SafeAreaView style={styles.safeArea}>
@@ -24,15 +25,24 @@ const ResultsScreen = () => {
         );
     }
 
-    // Find the current user's rank
-    const myRank = results.findIndex(p => p.id === user.id) + 1;
+    const myRank = user ? results.findIndex(p => p.id === user.id) + 1 : -1;
     const isWinner = myRank === 1;
 
-    const handlePlayAgain = () => {
-        // This resets the game state, and the GameNavigationHandler will automatically
-        // navigate the user back to the home screen.
+    /**
+     * CORRECTED: This function now handles both guest and logged-in users.
+     */
+    const handleFinishGame = () => {
+        // First, always reset the global game state.
         resetGame();
-    }
+
+        // If the user is a guest, they are in the GuestStack.
+        // popToTop() will send them back to the first screen in that stack (GuestJoinScreen).
+        if (user?.role === 'GUEST') {
+            navigation.popToTop();
+        }
+        // For logged-in users, the onStateChange listener in AppNavigator
+        // will automatically navigate them back to the main tabs.
+    };
 
     const renderPlayer = ({ item, index }) => (
         <View style={styles.playerRow}>
@@ -51,7 +61,7 @@ const ResultsScreen = () => {
                         <>
                          <Ionicons name="trophy" size={80} color="#FFD700" />
                          <Text style={styles.congratsText}>Congratulations!</Text>
-                         <Text style={styles.rankText}>You're on 1st Place</Text>
+                         <Text style={styles.rankText}>You finished in 1st Place!</Text>
                         </>
                     ) : (
                         <>
@@ -74,7 +84,7 @@ const ResultsScreen = () => {
                     style={styles.list}
                 />
 
-                <AppButton title="Back to Home" onPress={handlePlayAgain} />
+                <AppButton title="Finish" onPress={handleFinishGame} />
             </View>
         </SafeAreaView>
     );
