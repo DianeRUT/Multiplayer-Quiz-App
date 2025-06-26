@@ -1,30 +1,47 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute } from '@react-navigation/native';
 import { useGame } from '../../context/GameContext';
 import { colors, spacing, typography } from '../../theme/theme';
 import AppButton from '../../components/AppButton';
+import { Ionicons } from '@expo/vector-icons';
 
-const GameLobbyScreen = () => {
-    const route = useRoute();
-    const { gameState, startGame } = useGame();
+const GameLobbyScreen = ({ navigation, route }) => {
+    const { gameState, startGame, resetGame } = useGame();
     const { isHost } = route.params;
     const pin = route.params.pin || gameState.pin;
 
-    /**
-     * CORRECTED: Defensive access to the players array.
-     * We'll default to an empty array `[]` if `gameState.players` is not yet available.
-     * This prevents the `.length` error.
-     */
+    // A safe way to access the players array, defaulting to [] to prevent crashes.
     const players = gameState.players || [];
 
-    if (gameState.status !== 'lobby') {
+    /**
+     * This useEffect is the new "brain" for this screen.
+     * It listens for the game status to change. When the host starts the game,
+     * status becomes 'in-progress', and this will trigger navigation.
+     */
+    useEffect(() => {
+        if (gameState.status === 'in-progress') {
+            // Use replace so the user can't press the back button to return to the lobby.
+            navigation.replace('Quiz');
+        }
+    }, [gameState.status, navigation]);
+
+
+    // Handler for the back button
+    const handleGoBack = () => {
+        // We must reset the game state when leaving the lobby
+        resetGame();
+        navigation.goBack();
+    };
+
+    // A fallback UI for edge cases where the component might render before the state is ready.
+    if (gameState.status !== 'lobby' || !pin) {
         return (
             <SafeAreaView style={styles.safeArea}>
                 <View style={styles.centered}>
                     <ActivityIndicator size="large" color={colors.white} />
-                    <Text style={styles.infoText}>Loading Lobby...</Text>
+                    <Text style={styles.infoText}>Joining Lobby...</Text>
                 </View>
             </SafeAreaView>
         );
@@ -32,6 +49,11 @@ const GameLobbyScreen = () => {
 
     return (
         <SafeAreaView style={styles.safeArea}>
+            <View style={styles.header}>
+                <TouchableOpacity onPress={handleGoBack}>
+                    <Ionicons name="close-circle-outline" size={32} color={colors.gray} />
+                </TouchableOpacity>
+            </View>
             <View style={styles.container}>
                 <Text style={styles.title}>Game Lobby</Text>
                 <View style={styles.pinContainer}>
@@ -39,10 +61,9 @@ const GameLobbyScreen = () => {
                     <Text style={styles.pin}>{pin}</Text>
                 </View>
 
-                {/* Using the safe 'players' variable here */}
                 <Text style={styles.playerCount}>{players.length} Player(s) Joined</Text>
                 <FlatList
-                    data={players}  // Using the safe 'players' variable here
+                    data={players}
                     keyExtractor={(item) => item.id.toString()}
                     numColumns={2}
                     contentContainerStyle={styles.playerList}
@@ -53,26 +74,28 @@ const GameLobbyScreen = () => {
                         </View>
                     )}
                 />
-
-                {isHost && (
-                    <AppButton
-                        title="Start Quiz"
-                        onPress={startGame}
-                        disabled={players.length < 1} // Using the safe 'players' variable
-                    />
-                )}
-                 {!isHost && (
-                    <Text style={styles.infoText}>Waiting for the host to start the game...</Text>
-                 )}
+                
+                <View style={styles.footer}>
+                    {isHost && (
+                        <AppButton
+                            title="Start Quiz"
+                            onPress={startGame}
+                            disabled={players.length < 1}
+                        />
+                    )}
+                    {!isHost && (
+                        <Text style={styles.infoText}>Waiting for the host to start the game...</Text>
+                    )}
+                </View>
             </View>
         </SafeAreaView>
     );
 };
 
-// Styles remain the same
 const styles = StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    header: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
     container: { flex: 1, padding: spacing.md },
     title: { ...typography.h2, textAlign: 'center', marginBottom: spacing.lg },
     pinContainer: { backgroundColor: colors.darkPurple, padding: spacing.md, borderRadius: 12, alignItems: 'center', marginBottom: spacing.lg },
@@ -90,7 +113,10 @@ const styles = StyleSheet.create({
     },
     avatar: { width: 60, height: 60, borderRadius: 30, marginBottom: spacing.sm },
     playerName: { ...typography.body, fontWeight: 'bold' },
-    infoText: { ...typography.body, color: colors.textMuted, marginTop: spacing.lg },
+    footer: {
+        paddingVertical: spacing.md
+    },
+    infoText: { ...typography.body, color: colors.textMuted, textAlign: 'center' },
 });
 
 export default GameLobbyScreen;
