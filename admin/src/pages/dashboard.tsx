@@ -1,8 +1,8 @@
-import { DashboardStats } from "@/components/dashboard-stats"
+import { DashboardStatsComponent } from "@/components/dashboard-stats"
 import { QuickActions } from "@/components/quick-actions"
 import { UserGrowthChart } from "@/components/user-growth-chart"
 import { ActiveGames } from "@/components/active-games"
-import { RecentActivity } from "@/components/recent-activity"
+import { RecentActivityComponent } from "@/components/recent-activity"
 
 export function Dashboard() {
   return (
@@ -14,7 +14,7 @@ export function Dashboard() {
         </p>
       </div>
 
-      <DashboardStats />
+      <DashboardStatsComponent />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -23,7 +23,7 @@ export function Dashboard() {
         </div>
         <div className="space-y-6">
           <QuickActions />
-          <RecentActivity />
+          <RecentActivityComponent />
         </div>
       </div>
     </div>

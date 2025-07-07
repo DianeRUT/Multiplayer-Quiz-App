@@ -11,6 +11,9 @@ import {
   FileText,
   UserX,
   Settings,
+  BookOpen,
+  Swords,
+  Bell,
 } from "lucide-react"
 
 const navigation = [
@@ -20,7 +23,10 @@ const navigation = [
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Live Activity", href: "/live", icon: Activity },
   { name: "Categories", href: "/categories", icon: FolderOpen },
+  { name: "Quizzes", href: "/quizzes", icon: BookOpen },
   { name: "Tournaments", href: "/tournaments", icon: Trophy },
+  { name: "Battles", href: "/battles", icon: Swords },
+  { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Reports", href: "/reports", icon: FileText },
   { name: "Banned Users", href: "/banned", icon: UserX },
   { name: "Settings", href: "/settings", icon: Settings },

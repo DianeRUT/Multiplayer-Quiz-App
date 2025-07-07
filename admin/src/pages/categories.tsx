@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,16 +9,17 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Edit, Trash2, Eye, Search } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { categoriesAPI } from "@/services/api"
 
 interface Category {
   id: number
   name: string
-  description: string
-  questionCount: number
-  color: string
-  icon: string
-  status: string
   createdAt: string
+  description?: string
+  questionCount?: number
+  color?: string
+  icon?: string
+  status?: string
 }
 
 const initialCategories: Category[] = [
@@ -78,61 +79,55 @@ const categoryColors = [
 const categoryIcons = ["🔬", "🌍", "🎬", "⚽", "📚", "🎨", "🎵", "🏆", "🌍", "🚀", "💻", "🎮"]
 
 export function Categories() {
-  const [categories, setCategories] = useState<Category[]>(initialCategories)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
-  const [newCategory, setNewCategory] = useState({
-    name: "",
-    description: "",
-    color: "#3B82F6",
-    icon: "📚",
-    status: "Draft"
-  })
+  const [newCategory, setNewCategory] = useState({ name: "" })
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    categoriesAPI.getAll()
+      .then(res => setCategories(res))
+      .catch(() => setError("Failed to fetch categories"))
+      .finally(() => setLoading(false))
+  }, [])
 
   const filteredCategories = categories.filter(category => 
-    category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    category.description.toLowerCase().includes(searchTerm.toLowerCase())
+    category.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAddCategory = () => {
-    if (!newCategory.name || !newCategory.description) {
-      alert("Please fill in all required fields")
+  const handleAddCategory = async () => {
+    if (!newCategory.name) {
+      alert("Please fill in the category name")
       return
     }
-
-    const category: Category = {
-      id: Date.now(),
-      name: newCategory.name,
-      description: newCategory.description,
-      questionCount: 0,
-      color: newCategory.color,
-      icon: newCategory.icon,
-      status: newCategory.status,
-      createdAt: new Date().toISOString().split('T')[0],
+    try {
+      const res = await categoriesAPI.create(newCategory.name)
+      setCategories([...categories, res])
+      setNewCategory({ name: "" })
+      setIsAddDialogOpen(false)
+    } catch (err) {
+      alert("Failed to add category")
     }
-    setCategories([...categories, category])
-    setNewCategory({
-      name: "",
-      description: "",
-      color: "#3B82F6",
-      icon: "📚",
-      status: "Draft"
-    })
-    setIsAddDialogOpen(false)
   }
 
-  const handleEditCategory = () => {
+  const handleEditCategory = async () => {
     if (!selectedCategory) return
 
-    const updatedCategories = categories.map(category => 
-      category.id === selectedCategory.id ? selectedCategory : category
-    )
-    setCategories(updatedCategories)
-    setIsEditDialogOpen(false)
-    setSelectedCategory(null)
+    try {
+      const updatedCategory = await categoriesAPI.update(selectedCategory.id, selectedCategory.name)
+      setCategories(categories.map(category => 
+        category.id === selectedCategory.id ? updatedCategory : category
+      ))
+      setIsEditDialogOpen(false)
+      setSelectedCategory(null)
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to update category")
+    }
   }
 
   const handleViewCategory = (category: Category) => {
@@ -145,9 +140,14 @@ export function Categories() {
     setIsEditDialogOpen(true)
   }
 
-  const handleDeleteCategory = (id: number) => {
+  const handleDeleteCategory = async (id: number) => {
     if (confirm("Are you sure you want to delete this category? This will also delete all questions in this category.")) {
-      setCategories(categories.filter(category => category.id !== id))
+      try {
+        await categoriesAPI.delete(id)
+        setCategories(categories.filter(category => category.id !== id))
+      } catch (err: any) {
+        alert(err.response?.data?.message || "Failed to delete category")
+      }
     }
   }
 
@@ -183,175 +183,70 @@ export function Categories() {
                 <Input
                   id="category-name"
                   value={newCategory.name}
-                  onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                  onChange={(e) => setNewCategory({ name: e.target.value })}
                   placeholder="Enter category name"
                 />
               </div>
-              <div>
-                <Label htmlFor="category-description">Description</Label>
-                <Textarea
-                  id="category-description"
-                  value={newCategory.description}
-                  onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
-                  placeholder="Enter category description"
-                  className="min-h-[80px]"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="category-color">Color</Label>
-                  <Select value={newCategory.color} onValueChange={(value) => setNewCategory({ ...newCategory, color: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categoryColors.map((color) => (
-                        <SelectItem key={color.value} value={color.value}>
-                          <div className="flex items-center space-x-2">
-                            <div 
-                              className="w-4 h-4 rounded border"
-                              style={{ backgroundColor: color.value }}
-                            ></div>
-                            <span>{color.name}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="category-icon">Icon</Label>
-                  <Select value={newCategory.icon} onValueChange={(value) => setNewCategory({ ...newCategory, icon: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categoryIcons.map((icon) => (
-                        <SelectItem key={icon} value={icon}>
-                          <div className="flex items-center space-x-2">
-                            <span className="text-lg">{icon}</span>
-                            <span>Icon</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="category-status">Status</Label>
-                <Select value={newCategory.status} onValueChange={(value) => setNewCategory({ ...newCategory, status: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Draft">Draft</SelectItem>
-                    <SelectItem value="Active">Active</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleAddCategory}>
-                  Add Category
-                </Button>
-              </div>
+              <Button onClick={handleAddCategory} className="w-full">Add Category</Button>
             </div>
           </DialogContent>
         </Dialog>
       </div>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center space-x-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input 
-                placeholder="Search categories..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCategories.map((category) => (
-              <Card key={category.id} className="relative">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div 
-                        className="w-12 h-12 rounded-lg flex items-center justify-center text-2xl"
-                        style={{ backgroundColor: `${category.color}15` }}
+      <div className="flex items-center gap-4">
+        <Input
+          placeholder="Search categories..."
+          value={searchTerm}
+          onChange={e => setSearchTerm(e.target.value)}
+          className="max-w-xs"
+        />
+      </div>
+      {loading ? (
+        <div>Loading...</div>
+      ) : error ? (
+        <div className="text-red-500">{error}</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredCategories.map(category => (
+            <Card key={category.id}>
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <h2 className="font-bold text-lg">{category.name}</h2>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <span className="sr-only">Open menu</span>
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleViewCategory(category)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditClick(category)}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteCategory(category.id)}
+                        className="text-red-600"
                       >
-                        {category.icon}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">{category.name}</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{category.questionCount} questions</p>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleViewCategory(category)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Category
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEditClick(category)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Category
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleStatus(category.id)}>
-                          {category.status === "Active" ? "Deactivate" : "Activate"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem 
-                          className="text-red-600"
-                          onClick={() => handleDeleteCategory(category.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Delete Category
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{category.description}</p>
-                  
-                  <div className="flex items-center justify-between">
-                    <Badge
-                      variant={category.status === "Active" ? "default" : "secondary"}
-                      className={
-                        category.status === "Active"
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                          : ""
-                      }
-                    >
-                      {category.status}
-                    </Badge>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Created {category.createdAt}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {filteredCategories.length === 0 && (
-              <div className="col-span-full text-center py-8 text-gray-500">
-                No categories found matching your search.
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-500 text-sm">Created: {new Date(category.createdAt).toLocaleDateString()}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* View Category Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>

@@ -1,71 +1,20 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Plus, MoreHorizontal, UserPlus, Ban, Crown, Eye, Edit, Trash2 } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-
-interface User {
-  id: number
-  name: string
-  email: string
-  status: string
-  joinDate: string
-  gamesPlayed: number
-  avatar: string
-  role?: string
-}
-
-const initialUsers: User[] = [
-  {
-    id: 1,
-    name: "John Doe",
-    email: "john@example.com",
-    status: "active",
-    joinDate: "2024-01-15",
-    gamesPlayed: 45,
-    avatar: "/placeholder.svg?height=40&width=40",
-    role: "user"
-  },
-  {
-    id: 2,
-    name: "Jane Smith",
-    email: "jane@example.com",
-    status: "active",
-    joinDate: "2024-01-20",
-    gamesPlayed: 32,
-    avatar: "/placeholder.svg?height=40&width=40",
-    role: "moderator"
-  },
-  {
-    id: 3,
-    name: "Mike Johnson",
-    email: "mike@example.com",
-    status: "inactive",
-    joinDate: "2024-01-10",
-    gamesPlayed: 12,
-    avatar: "/placeholder.svg?height=40&width=40",
-    role: "user"
-  },
-  {
-    id: 4,
-    name: "Sarah Wilson",
-    email: "sarah@example.com",
-    status: "active",
-    joinDate: "2024-01-25",
-    gamesPlayed: 78,
-    avatar: "/placeholder.svg?height=40&width=40",
-    role: "admin"
-  },
-]
+import { usersAPI, User } from "@/services/api"
+import { useToast } from "@/hooks/use-toast"
 
 export function Users() {
-  const [users, setUsers] = useState<User[]>(initialUsers)
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -74,46 +23,101 @@ export function Users() {
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
-    role: "user",
-    status: "active"
+    password: "",
+    role: "CREATOR" as "CREATOR" | "ADMIN"
   })
+  const { toast } = useToast()
+
+  // Fetch users on component mount
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      const fetchedUsers = await usersAPI.getAll()
+      setUsers(fetchedUsers)
+    } catch (error: any) {
+      console.error('Error fetching users:', error)
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to fetch users",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredUsers = users.filter(user => 
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleAddUser = () => {
-    if (!newUser.name || !newUser.email) {
-      alert("Please fill in all required fields")
+  const handleAddUser = async () => {
+    if (!newUser.name || !newUser.email || !newUser.password) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      })
       return
     }
 
-    const user: User = {
-      id: Date.now(),
-      name: newUser.name,
-      email: newUser.email,
-      status: newUser.status,
-      joinDate: new Date().toISOString().split('T')[0],
-      gamesPlayed: 0,
-      avatar: "/placeholder.svg?height=40&width=40",
-      role: newUser.role
+    try {
+      const createdUser = await usersAPI.create({
+        name: newUser.name,
+        email: newUser.email,
+        password: newUser.password,
+        role: newUser.role
+      })
+      
+      setUsers([createdUser, ...users])
+      setNewUser({ name: "", email: "", password: "", role: "CREATOR" })
+      setIsAddDialogOpen(false)
+      
+      toast({
+        title: "Success",
+        description: "User created successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to create user",
+        variant: "destructive",
+      })
     }
-
-    setUsers([...users, user])
-    setNewUser({ name: "", email: "", role: "user", status: "active" })
-    setIsAddDialogOpen(false)
   }
 
-  const handleEditUser = () => {
+  const handleEditUser = async () => {
     if (!selectedUser) return
 
-    const updatedUsers = users.map(user => 
-      user.id === selectedUser.id ? selectedUser : user
-    )
-    setUsers(updatedUsers)
-    setIsEditDialogOpen(false)
-    setSelectedUser(null)
+    try {
+      const updatedUser = await usersAPI.update(selectedUser.id, {
+        name: selectedUser.name,
+        email: selectedUser.email,
+        role: selectedUser.role
+      })
+      
+      setUsers(users.map(user => 
+        user.id === selectedUser.id ? updatedUser : user
+      ))
+      
+      toast({
+        title: "Success",
+        description: "User updated successfully",
+      })
+      
+      setIsEditDialogOpen(false)
+      setSelectedUser(null)
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to update user",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleViewProfile = (user: User) => {
@@ -126,47 +130,154 @@ export function Users() {
     setIsEditDialogOpen(true)
   }
 
-  const handleBanUser = (id: number) => {
-    if (confirm("Are you sure you want to ban this user?")) {
+  const handleBanUser = async (id: number) => {
+    if (!confirm("Are you sure you want to ban this user?")) return
+
+    try {
+      const updatedUser = await usersAPI.ban(id)
       setUsers(users.map(user => 
-        user.id === id ? { ...user, status: "banned" } : user
+        user.id === id ? updatedUser : user
       ))
+      
+      toast({
+        title: "Success",
+        description: "User banned successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to ban user",
+        variant: "destructive",
+      })
     }
   }
 
-  const handleUnbanUser = (id: number) => {
-    setUsers(users.map(user => 
-      user.id === id ? { ...user, status: "active" } : user
-    ))
+  const handleUnbanUser = async (id: number) => {
+    try {
+      const updatedUser = await usersAPI.unban(id)
+      setUsers(users.map(user => 
+        user.id === id ? updatedUser : user
+      ))
+      
+      toast({
+        title: "Success",
+        description: "User unbanned successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to unban user",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handleDeleteUser = (id: number) => {
-    if (confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
+  const handleDeleteUser = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this user? This action cannot be undone.")) return
+
+    try {
+      await usersAPI.delete(id)
       setUsers(users.filter(user => user.id !== id))
+      
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to delete user",
+        variant: "destructive",
+      })
     }
   }
 
-  const handlePromoteToModerator = (id: number) => {
-    setUsers(users.map(user => 
-      user.id === id ? { ...user, role: "moderator" } : user
-    ))
+  const handlePromoteToModerator = async (id: number) => {
+    try {
+      const updatedUser = await usersAPI.promoteToModerator(id)
+      setUsers(users.map(user => 
+        user.id === id ? updatedUser : user
+      ))
+      
+      toast({
+        title: "Success",
+        description: "User promoted to moderator successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to promote user",
+        variant: "destructive",
+      })
+    }
   }
 
-  const handlePromoteToAdmin = (id: number) => {
-    setUsers(users.map(user => 
-      user.id === id ? { ...user, role: "admin" } : user
-    ))
+  const handlePromoteToAdmin = async (id: number) => {
+    try {
+      const updatedUser = await usersAPI.promoteToAdmin(id)
+      setUsers(users.map(user => 
+        user.id === id ? updatedUser : user
+      ))
+      
+      toast({
+        title: "Success",
+        description: "User promoted to admin successfully",
+      })
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Failed to promote user",
+        variant: "destructive",
+      })
+    }
   }
 
   const getRoleIcon = (role?: string) => {
     switch (role) {
-      case "admin":
+      case "ADMIN":
         return <Crown className="h-4 w-4 text-yellow-500" />
-      case "moderator":
+      case "CREATOR":
         return <Crown className="h-4 w-4 text-blue-500" />
       default:
         return null
     }
+  }
+
+  const getStatusBadge = (user: User) => {
+    const status = user.isVerified ? "active" : "banned"
+    return (
+      <Badge
+        variant={status === "active" ? "default" : "destructive"}
+        className={
+          status === "active"
+            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+            : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+        }
+      >
+        {status}
+      </Badge>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Users</h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">Loading users...</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading users...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -186,6 +297,9 @@ export function Users() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Add New User</DialogTitle>
+              <DialogDescription>
+                Create a new user account. The user will be automatically verified and can log in immediately.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -208,27 +322,24 @@ export function Users() {
                 />
               </div>
               <div>
-                <Label htmlFor="user-role">Role</Label>
-                <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="moderator">Moderator</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="user-password">Password</Label>
+                <Input
+                  id="user-password"
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  placeholder="Enter password"
+                />
               </div>
               <div>
-                <Label htmlFor="user-status">Status</Label>
-                <Select value={newUser.status} onValueChange={(value) => setNewUser({ ...newUser, status: value })}>
+                <Label htmlFor="user-role">Role</Label>
+                <Select value={newUser.role} onValueChange={(value: "CREATOR" | "ADMIN") => setNewUser({ ...newUser, role: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="CREATOR">Creator</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -268,7 +379,7 @@ export function Users() {
               >
                 <div className="flex items-center space-x-4">
                   <Avatar className="h-10 w-10">
-                    <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                    <AvatarImage src="/placeholder.svg" alt={user.name} />
                     <AvatarFallback>
                       {user.name
                         .split(" ")
@@ -287,22 +398,10 @@ export function Users() {
 
                 <div className="flex items-center space-x-4">
                   <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{user.gamesPlayed} games</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Joined {user.joinDate}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Joined {new Date(user.createdAt).toLocaleDateString()}</p>
                   </div>
 
-                  <Badge
-                    variant={user.status === "active" ? "default" : user.status === "banned" ? "destructive" : "secondary"}
-                    className={
-                      user.status === "active"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                        : user.status === "banned"
-                        ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                        : ""
-                    }
-                  >
-                    {user.status}
-                  </Badge>
+                  {getStatusBadge(user)}
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -319,17 +418,17 @@ export function Users() {
                         <Edit className="mr-2 h-4 w-4" />
                         Edit User
                       </DropdownMenuItem>
-                      {user.role !== "admin" && (
+                      {user.role !== "ADMIN" && (
                         <DropdownMenuItem onClick={() => handlePromoteToModerator(user.id)}>
                           Promote to Moderator
                         </DropdownMenuItem>
                       )}
-                      {user.role !== "admin" && (
+                      {user.role !== "ADMIN" && (
                         <DropdownMenuItem onClick={() => handlePromoteToAdmin(user.id)}>
                           Promote to Admin
                         </DropdownMenuItem>
                       )}
-                      {user.status === "active" ? (
+                      {user.isVerified ? (
                         <DropdownMenuItem 
                           className="text-red-600"
                           onClick={() => handleBanUser(user.id)}
@@ -371,6 +470,9 @@ export function Users() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
+            <DialogDescription>
+              Update user information. Changes will be saved immediately.
+            </DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4">
@@ -393,27 +495,13 @@ export function Users() {
               </div>
               <div>
                 <Label htmlFor="edit-user-role">Role</Label>
-                <Select value={selectedUser.role} onValueChange={(value) => setSelectedUser({ ...selectedUser, role: value })}>
+                <Select value={selectedUser.role} onValueChange={(value: "CREATOR" | "ADMIN") => setSelectedUser({ ...selectedUser, role: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">User</SelectItem>
-                    <SelectItem value="moderator">Moderator</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="edit-user-status">Status</Label>
-                <Select value={selectedUser.status} onValueChange={(value) => setSelectedUser({ ...selectedUser, status: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                    <SelectItem value="banned">Banned</SelectItem>
+                    <SelectItem value="CREATOR">Creator</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -435,12 +523,15 @@ export function Users() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>User Profile</DialogTitle>
+            <DialogDescription>
+              View detailed user information.
+            </DialogDescription>
           </DialogHeader>
           {selectedUser && (
             <div className="space-y-4">
               <div className="flex items-center space-x-4">
                 <Avatar className="h-16 w-16">
-                  <AvatarImage src={selectedUser.avatar} alt={selectedUser.name} />
+                  <AvatarImage src="/placeholder.svg" alt={selectedUser.name} />
                   <AvatarFallback>
                     {selectedUser.name.split(" ").map((n) => n[0]).join("")}
                   </AvatarFallback>
@@ -457,19 +548,25 @@ export function Users() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Status</Label>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedUser.status}</p>
-                </div>
-                <div>
-                  <Label>Games Played</Label>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedUser.gamesPlayed}</p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {selectedUser.isVerified ? "Active" : "Banned"}
+                  </p>
                 </div>
                 <div>
                   <Label>Join Date</Label>
-                  <p className="text-sm text-gray-900 dark:text-white">{selectedUser.joinDate}</p>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {new Date(selectedUser.createdAt).toLocaleDateString()}
+                  </p>
                 </div>
                 <div>
                   <Label>User ID</Label>
                   <p className="text-sm text-gray-900 dark:text-white">{selectedUser.id}</p>
+                </div>
+                <div>
+                  <Label>Email Verified</Label>
+                  <p className="text-sm text-gray-900 dark:text-white">
+                    {selectedUser.isVerified ? "Yes" : "No"}
+                  </p>
                 </div>
               </div>
             </div>

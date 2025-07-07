@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,89 +10,76 @@ import { Label } from "@/components/ui/label"
 import { Search, Plus, Edit, Trash2, Eye, Save, X, CheckCircle } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
+import { questionsAPI, quizzesAPI, categoriesAPI, Question, Quiz, Category } from "@/services/api"
 
-interface Question {
-  id: number
-  text: string
-  category: string
-  difficulty: string
-  type: string
-  status: string
-  createdAt: string
-  options?: string[]
-  correctAnswer?: string
+interface QuestionWithDetails extends Question {
+  quiz?: Quiz;
+  category?: Category;
 }
 
-const initialQuestions: Question[] = [
-  {
-    id: 1,
-    text: "What is the capital of France?",
-    category: "Geography",
-    difficulty: "Easy",
-    type: "Multiple Choice",
-    status: "Active",
-    createdAt: "2024-01-15",
-    options: ["London", "Paris", "Berlin", "Madrid"],
-    correctAnswer: "Paris"
-  },
-  {
-    id: 2,
-    text: "Which planet is known as the Red Planet?",
-    category: "Science",
-    difficulty: "Medium",
-    type: "Multiple Choice",
-    status: "Active",
-    createdAt: "2024-01-16",
-    options: ["Venus", "Mars", "Jupiter", "Saturn"],
-    correctAnswer: "Mars"
-  },
-  {
-    id: 3,
-    text: "Who wrote 'Romeo and Juliet'?",
-    category: "Literature",
-    difficulty: "Easy",
-    type: "Multiple Choice",
-    status: "Draft",
-    createdAt: "2024-01-17",
-    options: ["Charles Dickens", "William Shakespeare", "Jane Austen", "Mark Twain"],
-    correctAnswer: "William Shakespeare"
-  },
-]
-
-const categories = ["Geography", "Science", "Literature", "History", "Sports", "Entertainment"]
-const difficulties = ["Easy", "Medium", "Hard"]
-const questionTypes = ["Multiple Choice", "True/False", "Fill in the Blank"]
-
 export function Questions() {
-  const [questions, setQuestions] = useState<Question[]>(initialQuestions)
+  const [questions, setQuestions] = useState<QuestionWithDetails[]>([])
+  const [quizzes, setQuizzes] = useState<Quiz[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
-  const [selectedDifficulty, setSelectedDifficulty] = useState("all")
+  const [selectedQuiz, setSelectedQuiz] = useState("all")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
-  const [selectedQuestion, setSelectedQuestion] = useState<Question | null>(null)
-  const [newQuestion, setNewQuestion] = useState<Partial<Question>>({
+  const [selectedQuestion, setSelectedQuestion] = useState<QuestionWithDetails | null>(null)
+  const [newQuestion, setNewQuestion] = useState({
     text: "",
-    category: "Geography",
-    difficulty: "Easy",
-    type: "Multiple Choice",
-    status: "Draft",
+    quizId: "",
     options: ["", "", "", ""],
     correctAnswer: ""
   })
+  const [error, setError] = useState("")
   const { toast } = useToast()
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        console.log('Questions: Fetching data...');
+        const [questionsData, quizzesData, categoriesData] = await Promise.all([
+          questionsAPI.getAll(),
+          quizzesAPI.getAll(),
+          categoriesAPI.getAll()
+        ])
+        console.log('Questions: Received questions data:', questionsData);
+        console.log('Questions: Received quizzes data:', quizzesData);
+        console.log('Questions: Received categories data:', categoriesData);
+        setQuestions(questionsData)
+        setQuizzes(quizzesData)
+        setCategories(categoriesData)
+      } catch (err) {
+        console.error('Questions: Error fetching data:', err);
+        setError("Failed to fetch data")
+        toast({
+          title: "Error",
+          description: "Failed to load questions",
+          variant: "destructive"
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [toast])
 
   // Filter questions based on search and filters
   const filteredQuestions = questions.filter(question => {
     const matchesSearch = question.text.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCategory = selectedCategory === "all" || question.category === selectedCategory
-    const matchesDifficulty = selectedDifficulty === "all" || question.difficulty === selectedDifficulty
-    return matchesSearch && matchesCategory && matchesDifficulty
+    const matchesCategory = selectedCategory === "all" || 
+      question.quiz?.category?.name === selectedCategory
+    const matchesQuiz = selectedQuiz === "all" || 
+      question.quiz?.id?.toString() === selectedQuiz
+    return matchesSearch && matchesCategory && matchesQuiz
   })
 
-  const handleAddQuestion = () => {
-    if (!newQuestion.text || !newQuestion.correctAnswer) {
+  const handleAddQuestion = async () => {
+    if (!newQuestion.text || !newQuestion.correctAnswer || !newQuestion.quizId) {
       toast({
         title: "Error",
         description: "Please fill in all required fields",
@@ -101,64 +88,94 @@ export function Questions() {
       return
     }
 
-    const question: Question = {
-      id: Date.now(),
-      text: newQuestion.text,
-      category: newQuestion.category || "Geography",
-      difficulty: newQuestion.difficulty || "Easy",
-      type: newQuestion.type || "Multiple Choice",
-      status: newQuestion.status || "Draft",
-      createdAt: new Date().toISOString().split('T')[0],
-      options: newQuestion.options,
-      correctAnswer: newQuestion.correctAnswer
-    }
+    try {
+      const questionData = {
+        text: newQuestion.text,
+        quizId: parseInt(newQuestion.quizId),
+        options: newQuestion.options.map((option, index) => ({
+          text: option,
+          isCorrect: option === newQuestion.correctAnswer
+        })).filter(opt => opt.text.trim() !== "")
+      }
 
-    setQuestions([...questions, question])
-    setNewQuestion({
-      text: "",
-      category: "Geography",
-      difficulty: "Easy",
-      type: "Multiple Choice",
-      status: "Draft",
-      options: ["", "", "", ""],
-      correctAnswer: ""
-    })
-    setIsAddDialogOpen(false)
-    toast({
-      title: "Success",
-      description: "Question added successfully"
-    })
+      const createdQuestion = await questionsAPI.create(questionData)
+      setQuestions([createdQuestion, ...questions])
+      setNewQuestion({
+        text: "",
+        quizId: "",
+        options: ["", "", "", ""],
+        correctAnswer: ""
+      })
+      setIsAddDialogOpen(false)
+      toast({
+        title: "Success",
+        description: "Question added successfully"
+      })
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to add question",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleEditQuestion = () => {
+  const handleEditQuestion = async () => {
     if (!selectedQuestion) return
 
-    const updatedQuestions = questions.map(q => 
-      q.id === selectedQuestion.id ? selectedQuestion : q
-    )
-    setQuestions(updatedQuestions)
-    setIsEditDialogOpen(false)
-    setSelectedQuestion(null)
-    toast({
-      title: "Success",
-      description: "Question updated successfully"
-    })
+    try {
+      const questionData = {
+        text: selectedQuestion.text,
+        options: selectedQuestion.options?.map((option, index) => ({
+          text: option.text,
+          isCorrect: option.isCorrect
+        })) || []
+      }
+
+      const updatedQuestion = await questionsAPI.update(selectedQuestion.id, questionData)
+      setQuestions(questions.map(q => 
+        q.id === selectedQuestion.id ? updatedQuestion : q
+      ))
+      setIsEditDialogOpen(false)
+      setSelectedQuestion(null)
+      toast({
+        title: "Success",
+        description: "Question updated successfully"
+      })
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.response?.data?.message || "Failed to update question",
+        variant: "destructive"
+      })
+    }
   }
 
-  const handleDeleteQuestion = (id: number) => {
-    setQuestions(questions.filter(q => q.id !== id))
-    toast({
-      title: "Success",
-      description: "Question deleted successfully"
-    })
+  const handleDeleteQuestion = async (id: number) => {
+    if (confirm("Are you sure you want to delete this question?")) {
+      try {
+        await questionsAPI.delete(id)
+        setQuestions(questions.filter(q => q.id !== id))
+        toast({
+          title: "Success",
+          description: "Question deleted successfully"
+        })
+      } catch (err: any) {
+        toast({
+          title: "Error",
+          description: err.response?.data?.message || "Failed to delete question",
+          variant: "destructive"
+        })
+      }
+    }
   }
 
-  const handleViewQuestion = (question: Question) => {
+  const handleViewQuestion = (question: QuestionWithDetails) => {
     setSelectedQuestion(question)
     setIsViewDialogOpen(true)
   }
 
-  const handleEditClick = (question: Question) => {
+  const handleEditClick = (question: QuestionWithDetails) => {
     setSelectedQuestion({ ...question })
     setIsEditDialogOpen(true)
   }
@@ -173,8 +190,14 @@ export function Questions() {
   const handleEditSetCorrectAnswer = (optionIndex: number) => {
     if (!selectedQuestion?.options) return
     const option = selectedQuestion.options[optionIndex]
-    if (option && option.trim()) {
-      setSelectedQuestion({ ...selectedQuestion, correctAnswer: option })
+    if (option && option.text.trim()) {
+      setSelectedQuestion({ 
+        ...selectedQuestion, 
+        options: selectedQuestion.options.map((opt, idx) => ({
+          ...opt,
+          isCorrect: idx === optionIndex
+        }))
+      })
     }
   }
 
@@ -192,13 +215,8 @@ export function Questions() {
   const handleEditOptionChange = (index: number, value: string) => {
     if (!selectedQuestion?.options) return
     const newOptions = [...selectedQuestion.options]
-    newOptions[index] = value
+    newOptions[index] = { ...newOptions[index], text: value }
     setSelectedQuestion({ ...selectedQuestion, options: newOptions })
-    
-    // If this was the correct answer, update it
-    if (selectedQuestion.correctAnswer === selectedQuestion.options[index]) {
-      setSelectedQuestion({ ...selectedQuestion, options: newOptions, correctAnswer: value })
-    }
   }
 
   return (
@@ -232,94 +250,67 @@ export function Questions() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <Label htmlFor="quiz">Quiz</Label>
+                  <Select value={newQuestion.quizId} onValueChange={(value) => setNewQuestion({ ...newQuestion, quizId: value })}>
+                    <SelectTrigger id="quiz">
+                      <SelectValue placeholder="Select a quiz" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {quizzes.map((quiz) => (
+                        <SelectItem key={quiz.id} value={quiz.id.toString()}>
+                          {quiz.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label htmlFor="category">Category</Label>
-                  <Select value={newQuestion.category} onValueChange={(value) => setNewQuestion({ ...newQuestion, category: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
                       {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="difficulty">Difficulty</Label>
-                  <Select value={newQuestion.difficulty} onValueChange={(value) => setNewQuestion({ ...newQuestion, difficulty: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {difficulties.map((difficulty) => (
-                        <SelectItem key={difficulty} value={difficulty}>
-                          {difficulty}
+                        <SelectItem key={category.id} value={category.name}>
+                          {category.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div>
-                <Label htmlFor="type">Question Type</Label>
-                <Select value={newQuestion.type} onValueChange={(value) => setNewQuestion({ ...newQuestion, type: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {questionTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-3">
+                <Label>Options</Label>
+                {newQuestion.options?.map((option, index) => (
+                  <div key={index} className="flex items-center space-x-2">
+                    <Input
+                      value={option}
+                      onChange={(e) => handleOptionChange(index, e.target.value)}
+                      placeholder={`Option ${index + 1}`}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant={newQuestion.correctAnswer === option ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => handleSetCorrectAnswer(index)}
+                      disabled={!option.trim()}
+                      className="min-w-[120px] transition-all duration-200 hover:scale-105"
+                    >
+                      {newQuestion.correctAnswer === option ? (
+                        <>
+                          <CheckCircle className="mr-1 h-4 w-4" />
+                          Correct
+                        </>
+                      ) : (
+                        "Mark Correct"
+                      )}
+                    </Button>
+                  </div>
+                ))}
               </div>
-              {newQuestion.type === "Multiple Choice" && (
-                <div className="space-y-3">
-                  <Label>Options</Label>
-                  {newQuestion.options?.map((option, index) => (
-                    <div key={index} className="flex items-center space-x-2">
-                      <Input
-                        value={option}
-                        onChange={(e) => handleOptionChange(index, e.target.value)}
-                        placeholder={`Option ${index + 1}`}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant={newQuestion.correctAnswer === option ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handleSetCorrectAnswer(index)}
-                        disabled={!option.trim()}
-                        className="min-w-[120px] transition-all duration-200 hover:scale-105"
-                      >
-                        {newQuestion.correctAnswer === option ? (
-                          <>
-                            <CheckCircle className="mr-1 h-4 w-4" />
-                            Correct
-                          </>
-                        ) : (
-                          "Mark Correct"
-                        )}
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {newQuestion.type !== "Multiple Choice" && (
-                <div>
-                  <Label htmlFor="correct-answer">Correct Answer</Label>
-                  <Input
-                    id="correct-answer"
-                    value={newQuestion.correctAnswer}
-                    onChange={(e) => setNewQuestion({ ...newQuestion, correctAnswer: e.target.value })}
-                    placeholder="Enter the correct answer"
-                  />
-                </div>
-              )}
               <div className="flex justify-end space-x-2">
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   Cancel
@@ -347,27 +338,27 @@ export function Questions() {
               />
             </div>
             <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-48" id="filter-category">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
+                  <SelectItem key={category.id} value={category.name}>
+                    {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={selectedDifficulty} onValueChange={setSelectedDifficulty}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Difficulty" />
+            <Select value={selectedQuiz} onValueChange={setSelectedQuiz}>
+              <SelectTrigger className="w-48" id="filter-quiz">
+                <SelectValue placeholder="All Quizzes" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                {difficulties.map((difficulty) => (
-                  <SelectItem key={difficulty} value={difficulty}>
-                    {difficulty}
+                <SelectItem value="all">All Quizzes</SelectItem>
+                {quizzes.map((quiz) => (
+                  <SelectItem key={quiz.id} value={quiz.id.toString()}>
+                    {quiz.title}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -384,37 +375,17 @@ export function Questions() {
                 <div className="flex-1">
                   <h3 className="font-medium text-gray-900 dark:text-white mb-2">{question.text}</h3>
                   <div className="flex items-center space-x-4 text-sm text-gray-600 dark:text-gray-400">
-                    <span>{question.category}</span>
+                    <span>Quiz: {question.quiz?.title || 'Unknown'}</span>
                     <span>•</span>
-                    <span>{question.type}</span>
+                    <span>Category: {question.quiz?.category?.name || 'Unknown'}</span>
                     <span>•</span>
-                    <span>Created {question.createdAt}</span>
+                    <span>Options: {question.options?.length || 0}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-4">
-                  <Badge
-                    variant={question.difficulty === "Easy" ? "default" : question.difficulty === "Medium" ? "secondary" : "destructive"}
-                    className={
-                      question.difficulty === "Easy"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                        : question.difficulty === "Medium"
-                        ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                    }
-                  >
-                    {question.difficulty}
-                  </Badge>
-
-                  <Badge
-                    variant={question.status === "Active" ? "default" : "secondary"}
-                    className={
-                      question.status === "Active"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                        : ""
-                    }
-                  >
-                    {question.status}
+                  <Badge variant="secondary">
+                    {question.quiz?.status || 'Unknown'}
                   </Badge>
 
                   <DropdownMenu>
@@ -467,12 +438,12 @@ export function Questions() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Category</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedQuestion.category}</p>
+                  <Label>Quiz</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedQuestion.quiz?.title || 'Unknown'}</p>
                 </div>
                 <div>
-                  <Label>Difficulty</Label>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedQuestion.difficulty}</p>
+                  <Label>Category</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{selectedQuestion.quiz?.category?.name || 'Unknown'}</p>
                 </div>
               </div>
               {selectedQuestion.options && (
@@ -482,8 +453,8 @@ export function Questions() {
                     {selectedQuestion.options.map((option, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         <span className="text-sm">{String.fromCharCode(65 + index)}.</span>
-                        <span className="text-sm">{option}</span>
-                        {option === selectedQuestion.correctAnswer && (
+                        <span className="text-sm">{option.text}</span>
+                        {option.isCorrect && (
                           <Badge variant="default" className="text-xs">Correct</Badge>
                         )}
                       </div>
@@ -513,73 +484,34 @@ export function Questions() {
                   className="min-h-[80px]"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Category</Label>
-                  <Select value={selectedQuestion.category} onValueChange={(value) => setSelectedQuestion({ ...selectedQuestion, category: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Difficulty</Label>
-                  <Select value={selectedQuestion.difficulty} onValueChange={(value) => setSelectedQuestion({ ...selectedQuestion, difficulty: value })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {difficulties.map((difficulty) => (
-                        <SelectItem key={difficulty} value={difficulty}>
-                          {difficulty}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label>Quiz</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedQuestion.quiz?.title || 'Unknown'}</p>
               </div>
               <div>
-                <Label>Question Type</Label>
-                <Select value={selectedQuestion.type} onValueChange={(value) => setSelectedQuestion({ ...selectedQuestion, type: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {questionTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Category</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{selectedQuestion.quiz?.category?.name || 'Unknown'}</p>
               </div>
-              {selectedQuestion.type === "Multiple Choice" && selectedQuestion.options && (
+              {selectedQuestion.options && (
                 <div className="space-y-3">
                   <Label>Options</Label>
                   {selectedQuestion.options.map((option, index) => (
                     <div key={index} className="flex items-center space-x-2">
                       <Input
-                        value={option}
+                        value={option.text}
                         onChange={(e) => handleEditOptionChange(index, e.target.value)}
                         placeholder={`Option ${index + 1}`}
                         className="flex-1"
                       />
                       <Button
                         type="button"
-                        variant={selectedQuestion.correctAnswer === option ? "default" : "outline"}
+                        variant={option.isCorrect ? "default" : "outline"}
                         size="sm"
                         onClick={() => handleEditSetCorrectAnswer(index)}
-                        disabled={!option.trim()}
+                        disabled={!option.text.trim()}
                         className="min-w-[120px] transition-all duration-200 hover:scale-105"
                       >
-                        {selectedQuestion.correctAnswer === option ? (
+                        {option.isCorrect ? (
                           <>
                             <CheckCircle className="mr-1 h-4 w-4" />
                             Correct
@@ -590,17 +522,6 @@ export function Questions() {
                       </Button>
                     </div>
                   ))}
-                </div>
-              )}
-              {selectedQuestion.type !== "Multiple Choice" && (
-                <div>
-                  <Label htmlFor="edit-correct-answer">Correct Answer</Label>
-                  <Input
-                    id="edit-correct-answer"
-                    value={selectedQuestion.correctAnswer}
-                    onChange={(e) => setSelectedQuestion({ ...selectedQuestion, correctAnswer: e.target.value })}
-                    placeholder="Enter the correct answer"
-                  />
                 </div>
               )}
               <div className="flex justify-end space-x-2 pt-4">

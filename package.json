@@ -1,0 +1,87 @@
+{
+  "name": "multiplayer-quiz-app",
+  "version": "1.0.0",
+  "description": "Multiplayer Quiz Application with Admin Dashboard",
+  "private": true,
+  "workspaces": [
+    "MultiplayerQuizBe",
+    "admin",
+    "mobile-app"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd MultiplayerQuizBe && npm run dev",
+    "dev:frontend": "cd admin && npm run dev",
+    "dev:mobile": "cd mobile-app && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd MultiplayerQuizBe && npm run build",
+    "build:frontend": "cd admin && npm run build",
+    "build:mobile": "cd mobile-app && npm run build",
+    "start": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "start:backend": "cd MultiplayerQuizBe && npm start",
+    "start:frontend": "cd admin && npm run serve",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd MultiplayerQuizBe && npm test",
+    "test:frontend": "cd admin && npm run test:run",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd MultiplayerQuizBe && npm run lint",
+    "lint:frontend": "cd admin && npm run lint",
+    "lint:fix": "npm run lint:fix:backend && npm run lint:fix:frontend",
+    "lint:fix:backend": "cd MultiplayerQuizBe && npm run lint:fix",
+    "lint:fix:frontend": "cd admin && npm run lint:fix",
+    "format": "npm run format:backend && npm run format:frontend",
+    "format:backend": "cd MultiplayerQuizBe && npm run format",
+    "format:frontend": "cd admin && npm run format",
+    "clean": "npm run clean:backend && npm run clean:frontend",
+    "clean:backend": "cd MultiplayerQuizBe && npm run clean",
+    "clean:frontend": "cd admin && npm run clean",
+    "setup": "npm install && npm run setup:backend && npm run setup:frontend",
+    "setup:backend": "cd MultiplayerQuizBe && npm run setup",
+    "setup:frontend": "cd admin && npm run setup",
+    "db:setup": "cd MultiplayerQuizBe && npm run db:setup",
+    "db:migrate": "cd MultiplayerQuizBe && npm run db:migrate",
+    "db:seed": "cd MultiplayerQuizBe && npm run db:seed",
+    "db:reset": "cd MultiplayerQuizBe && npm run db:reset",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:clean": "docker-compose down -v --remove-orphans",
+    "deploy:staging": "npm run build && npm run test && echo 'Deploy to staging'",
+    "deploy:production": "npm run build && npm run test && echo 'Deploy to production'",
+    "health": "npm run health:backend && npm run health:frontend",
+    "health:backend": "cd MultiplayerQuizBe && npm run health",
+    "health:frontend": "cd admin && npm run health",
+    "install:all": "npm install && cd MultiplayerQuizBe && npm install && cd ../admin && npm install",
+    "update:all": "npm update && cd MultiplayerQuizBe && npm update && cd ../admin && npm update",
+    "outdated": "npm outdated && cd MultiplayerQuizBe && npm outdated && cd ../admin && npm outdated",
+    "audit": "npm audit && cd MultiplayerQuizBe && npm audit && cd ../admin && npm audit",
+    "audit:fix": "npm audit fix && cd MultiplayerQuizBe && npm audit fix && cd ../admin && npm audit fix"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.0",
+    "cross-env": "^7.0.3",
+    "husky": "^8.0.0",
+    "lint-staged": "^13.0.0"
+  },
+  "lint-staged": {
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": [
+    "quiz",
+    "multiplayer",
+    "admin-dashboard",
+    "react",
+    "nodejs",
+    "typescript",
+    "postgresql"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+} 

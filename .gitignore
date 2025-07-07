@@ -254,4 +254,36 @@ api/uploads/
 
 # Local development
 .local/
-local/ 
+local/
+
+# Uploads/Media files
+uploads/
+public/uploads/
+media/
+assets/uploads/
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+Dockerfile.dev
+
+# Performance monitoring
+test-results/
+playwright-report/
+cypress/videos/
+cypress/screenshots/
+
+# IDE specific
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Backup directories
+backup/
+backups/ 
